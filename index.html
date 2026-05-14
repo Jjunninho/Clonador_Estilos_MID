@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clonar Estilo</title>
+<link rel="stylesheet" href="css/clone.css">
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="logo">CLONADOR DE ESTILOS</div>
+  <p class="tagline">Análise de tonalidade via algoritmo Krumhansl-Schmuckler</p>
+
+  <!-- Barra de status da chave API -->
+  <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
+    <span id="api-key-status"
+      style="font-family:'Press Start 2P',monospace;font-size:8px;letter-spacing:0.5px;">
+      Verificando chave...
+    </span>
+    <button onclick="window.groqClearKey && window.groqClearKey()"
+      style="font-family:'Press Start 2P',monospace;font-size:7px;
+             background:transparent;border:1px solid #444;color:#888;
+             border-radius:2px;padding:4px 8px;cursor:pointer;letter-spacing:0.5px;"
+      title="Trocar ou configurar chave Groq">
+      🔑 TROCAR CHAVE
+    </button>
+  </div>
+</header>
+
+<!-- Atualiza o indicador de status da chave ao carregar a página -->
+<script>
+  // Lê do localStorage e exibe o status inicial (antes do módulo ES carregar)
+  (function () {
+    const key = localStorage.getItem('groq_api_key');
+    const el  = document.getElementById('api-key-status');
+    if (!el) return;
+    if (key) {
+      el.textContent = 'Chave: ' + key.slice(0, 8) + '...';
+      el.style.color = '#4ade80';
+    } else {
+      el.textContent = '⚠ Chave não configurada — configure ao gerar';
+      el.style.color = '#f87171';
+    }
+  })();
+</script>
+
+  <div class="card card-clone">
+    <div class="section-title">
+      🧬 Clonar Estilo
+      <span class="badge badge-clone">CLONE</span>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.7">
+      Carregue um MIDI ou cole um JSON de referencia. A IA analisa o estilo e gera uma peça nova com a mesma personalidade usando o mesmo BPM, instrumento e tonalidade.
+    </p>
+
+    <label>Referencia de estilo</label>
+    <div class="clone-source">
+      <div class="clone-drop" id="clone-drop">
+        <input type="file" id="clone-file" accept=".mid,.midi" onchange="handleCloneUpload(this)">
+        <div class="clone-drop-icon">🎼</div>
+        <div class="clone-drop-text">Upload .mid</div>
+        <div class="clone-drop-loaded" id="clone-loaded"></div>
+      </div>
+
+      <div class="clone-or">OU</div>
+
+      <div class="clone-json-wrap">
+        <label>Colar JSON de referencia</label>
+        <textarea id="clone-json" placeholder='{"notas":[{"nota":60,"inicio":0,"duracao":960,"velocidade":85},...]}' style="height:100px;font-size:11px;"></textarea>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <label style="margin:0;font-size:12px;">BPM do JSON:</label>
+          <input type="number" id="clone-bpm-manual" value="90" min="40" max="200"
+            style="width:70px;padding:4px 8px;background:#001500;border:1px solid var(--gd);border-radius:2px;color:var(--g);font-family:'Press Start 2P',monospace;font-size:9px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL DE ANALISE DA REFERENCIA -->
+    <div id="clone-analysis-panel" style="display:none"></div>
+
+    <label>Variacoes de estilo</label>
+    <div class="clone-style-btns">
+      <button class="style-btn" onclick="toggleStyle(this,'mesmo andamento')">Mesmo andamento</button>
+      <button class="style-btn" onclick="toggleStyle(this,'mesma tonalidade')">Mesma tonalidade</button>
+      <button class="style-btn" onclick="toggleStyle(this,'mesma densidade ritmica')">Mesma densidade</button>
+      <button class="style-btn" onclick="toggleStyle(this,'mais agudo')">Mais agudo</button>
+      <button class="style-btn" onclick="toggleStyle(this,'mais grave')">Mais grave</button>
+      <button class="style-btn" onclick="toggleStyle(this,'mais suave e delicado')">Mais suave</button>
+      <button class="style-btn" onclick="toggleStyle(this,'mais intenso e dramatico')">Mais intenso</button>
+      <button class="style-btn" onclick="toggleStyle(this,'melodia bastante diferente')">Variar melodia</button>
+    </div>
+
+    <label>Instrucao adicional (opcional)</label>
+    <textarea id="clone-desc" style="height:72px;" placeholder="Ex: transformar em valsa, adicionar contraponto, deixar mais dramatico..."></textarea>
+
+    <div class="params" style="margin-top:20px">
+      <div class="param-group">
+        <label>Instrumento</label>
+        <select id="clone-instrument">
+          <option value="-1">Manter original</option>
+          <option value="0">Piano Acustico</option>
+          <option value="25">Violao</option>
+          <option value="40">Violino</option>
+          <option value="56">Trompete</option>
+          <option value="73">Flauta</option>
+          <option value="48">Cordas</option>
+          <option value="80">Lead Synth</option>
+          <option value="88">Pad Synth</option>
+        </select>
+      </div>
+      <div class="param-group">
+        <label>Duracao (seg)</label>
+        <div class="range-wrap">
+          <input type="range" id="clone-duration" min="5" max="60" value="15">
+          <span class="range-val" id="clone-duration-val">15</span>
+        </div>
+      </div>
+      <div class="param-group">
+        <label>Criatividade IA</label>
+        <div class="range-wrap">
+          <input type="range" id="clone-temp" min="1" max="10" value="7">
+          <span class="range-val" id="clone-temp-val">0.7</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-main btn-clone" id="btn-clone" onclick="cloneStyle()">CLONAR ESTILO</button>
+    </div>
+
+    <!-- PAINEL DE PARAMETROS DA IA -->
+    <div id="clone-params-panel" style="display:none"></div>
+
+    <div class="status-bar" id="status-clone"></div>
+
+    <div class="result-section" id="result-clone">
+      <div class="result-header">
+        <span class="result-label">clone gerado</span>
+        <a id="dl-clone" class="btn-dl btn-dl-clone" download="clone-mid.mid">Download MIDI</a>
+      </div>
+      <canvas class="piano-roll" id="canvas-clone"></canvas>
+
+      <div class="player-bar">
+        <button class="btn-play" id="btn-play-clone" onclick="playerToggle('clone')">&#9654;</button>
+        <button class="btn-stop-play" onclick="playerStop('clone')">&#9632;</button>
+        <div class="player-seek-wrap" id="seek-clone" onclick="playerSeek('clone', event)">
+          <div class="player-seek-fill" id="fill-clone"></div>
+        </div>
+        <span class="player-time" id="time-clone">0:00</span>
+        <div class="player-vol">
+          <span class="player-vol-icon">🔊</span>
+          <input type="range" min="0" max="1" step="0.05" value="0.5"
+                 oninput="playerVol('clone', this.value)">
+        </div>
+      </div>
+
+      <div class="midi-viz" id="viz-clone"></div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="js/main-clone.js"></script>
+</body>
+</html>
